@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Bot — Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+      --border: #30363d; --text: #e6edf3; --sub: #8b949e;
+      --green: #3fb950; --red: #f85149; --blue: #388bfd;
+      --gold: #d29922; --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .stat-card .label { font-size: .75rem; color: var(--sub); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+    .stat-card .value { font-size: 1.8rem; font-weight: 700; }
+    .stat-card .value.green { color: var(--green); }
+    .stat-card .value.red   { color: var(--red); }
+    .stat-card .value.gold  { color: var(--gold); }
+    .stat-card .value.blue  { color: var(--blue); }
+
+    .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; color: var(--sub); display: flex; align-items: center; gap: 8px; }
+
+    .signals-grid { display: grid; gap: 12px; }
+    .signal-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; transition: border-color .2s; }
+    .signal-card:hover { border-color: var(--blue); }
+    .signal-card.buy  { border-left: 3px solid var(--green); }
+    .signal-card.sell { border-left: 3px solid var(--red); }
+    .signal-card.hold { border-left: 3px solid var(--sub); }
+
+    .signal-dir { font-size: 1.5rem; font-weight: 800; }
+    .signal-dir.BUY  { color: var(--green); }
+    .signal-dir.SELL { color: var(--red); }
+    .signal-dir.HOLD { color: var(--sub); }
+
+    .signal-pair { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .signal-meta { font-size: .8rem; color: var(--sub); }
+
+    .signal-prices { display: grid; gap: 4px; text-align: right; }
+    .price-row { display: flex; justify-content: space-between; gap: 16px; font-size: .82rem; }
+    .price-label { color: var(--sub); }
+    .price-val { font-weight: 600; font-family: monospace; }
+
+    .confidence-bar { height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 12px; overflow: hidden; }
+    .confidence-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--blue), var(--green)); transition: width .5s; }
+
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+    .badge.buy  { background: rgba(63,185,80,.15); color: var(--green); }
+    .badge.sell { background: rgba(248,81,73,.15); color: var(--red); }
+
+    .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .btn { padding: 8px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg2); color: var(--text); cursor: pointer; font-size: .85rem; transition: all .2s; }
+    .btn:hover { background: var(--bg3); border-color: var(--blue); }
+    .btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    .api-section { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-top: 24px; }
+    .api-token { display: flex; gap: 8px; margin-top: 12px; }
+    .api-token input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: var(--radius); font-family: monospace; font-size: .85rem; }
+
+    .empty { text-align: center; padding: 60px; color: var(--sub); }
+    .empty .icon { font-size: 3rem; margin-bottom: 12px; }
+
+    .refresh-info { font-size: .75rem; color: var(--sub); text-align: right; margin-bottom: 12px; }
+
+    @media (max-width: 600px) {
+      .signal-card { grid-template-columns: 1fr; }
+      .signal-prices { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <div class="status-dot" id="statusDot"></div>
+    🤖 Trading Bot Dashboard
+  </h1>
+  <span style="font-size:.8rem;color:var(--sub)" id="lastUpdate">—</span>
+</header>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="label">Signaux actifs</div>
+      <div class="value blue" id="statActive">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">BUY</div>
+      <div class="value green" id="statBuy">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">SELL</div>
+      <div class="value red" id="statSell">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Confiance moy.</div>
+      <div class="value gold" id="statConf">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">R/R moyen</div>
+      <div class="value blue" id="statRR">—</div>
+    </div>
+  </div>
+
+  <!-- Filtres -->
+  <div class="toolbar">
+    <button class="btn active" onclick="filterSignals('ALL', this)">Tous</button>
+    <button class="btn" onclick="filterSignals('BUY', this)">🟢 BUY</button>
+    <button class="btn" onclick="filterSignals('SELL', this)">🔴 SELL</button>
+    <button class="btn" onclick="loadSignals()">↻ Actualiser</button>
+  </div>
+
+  <div class="refresh-info" id="refreshInfo">Actualisation auto toutes les 60s</div>
+
+  <!-- Signaux -->
+  <div class="section-title">📡 Derniers signaux</div>
+  <div class="signals-grid" id="signalsContainer">
+    <div class="empty">
+      <div class="icon">📊</div>
+      <div>Chargement des signaux...</div>
+    </div>
+  </div>
+
+  <!-- Config API -->
+  <div class="api-section">
+    <div class="section-title">⚙️ Configuration API</div>
+    <p style="font-size:.85rem;color:var(--sub);margin-bottom:12px">
+      Entrez votre token API pour charger les signaux depuis le bot.
+    </p>
+    <div class="api-token">
+      <input type="password" id="apiToken" placeholder="Votre token API (API_SECRET)" />
+      <button class="btn" onclick="saveToken()">Sauvegarder</button>
+    </div>
+    <div style="margin-top:12px;font-size:.8rem;color:var(--sub)">
+      URL de l'API : <code id="apiUrl" style="color:var(--blue)">http://localhost:8000</code>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let currentFilter = 'ALL';
+  let allSignals    = [];
+  let apiToken      = localStorage.getItem('api_token') || '';
+  let apiBase       = localStorage.getItem('api_base') || window.location.origin;
+
+  if (apiToken) document.getElementById('apiToken').value = apiToken;
+  document.getElementById('apiUrl').textContent = apiBase + '/signals';
+
+  function saveToken() {
+    apiToken = document.getElementById('apiToken').value.trim();
+    localStorage.setItem('api_token', apiToken);
+    loadSignals();
+  }
+
+  async function loadSignals() {
+    try {
+      const resp = await fetch(`${apiBase}/signals`, {
+        headers: { 'Authorization': `Bearer ${apiToken}` }
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      allSignals = await resp.json();
+      renderSignals();
+      updateStats();
+      document.getElementById('lastUpdate').textContent = 'Mis à jour : ' + new Date().toLocaleTimeString('fr');
+      document.getElementById('statusDot').style.background = 'var(--green)';
+    } catch (e) {
+      console.warn('API non disponible, affichage des données démo');
+      allSignals = getDemoSignals();
+      renderSignals();
+      updateStats();
+      document.getElementById('statusDot').style.background = 'var(--gold)';
+    }
+  }
+
+  function renderSignals() {
+    const container = document.getElementById('signalsContainer');
+    let filtered    = allSignals.filter(s => s.direction !== 'HOLD');
+    if (currentFilter !== 'ALL') filtered = filtered.filter(s => s.direction === currentFilter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div class="empty"><div class="icon">🔍</div><div>Aucun signal ${currentFilter !== 'ALL' ? currentFilter : ''} disponible</div></div>`;
+      return;
+    }
+
+    container.innerHTML = filtered.slice(-20).reverse().map(s => `
+      <div class="signal-card ${s.direction.toLowerCase()}">
+        <div>
+          <div class="signal-dir ${s.direction}">${s.direction}</div>
+          <div style="margin-top:4px"><span class="badge ${s.direction.toLowerCase()}">${s.timeframe}</span></div>
+        </div>
+        <div>
+          <div class="signal-pair">${s.pair}</div>
+          <div class="signal-meta">${formatTime(s.timestamp)}</div>
+          <div class="confidence-bar" style="margin-top:10px">
+            <div class="confidence-fill" style="width:${s.confidence}%"></div>
+          </div>
+          <div style="font-size:.75rem;color:var(--sub);margin-top:4px">Confiance: ${s.confidence}%</div>
+        </div>
+        <div class="signal-prices">
+          <div class="price-row"><span class="price-label">Entrée</span><span class="price-val">${s.entry_price}</span></div>
+          <div class="price-row"><span class="price-label" style="color:var(--red)">SL</span><span class="price-val">${s.stop_loss}</span></div>
+          <div class="price-row"><span class="price-label" style="color:var(--green)">TP</span><span class="price-val">${s.take_profit}</span></div>
+          <div class="price-row"><span class="price-label">R/R</span><span class="price-val">1:${s.risk_reward}</span></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function updateStats() {
+    const active = allSignals.filter(s => s.direction !== 'HOLD');
+    const buys   = active.filter(s => s.direction === 'BUY');
+    const sells  = active.filter(s => s.direction === 'SELL');
+    const avgConf = active.length ? (active.reduce((a,s) => a + s.confidence, 0) / active.length).toFixed(1) + '%' : '—';
+    const avgRR   = active.length ? '1:' + (active.reduce((a,s) => a + s.risk_reward, 0) / active.length).toFixed(2) : '—';
+    document.getElementById('statActive').textContent = active.length;
+    document.getElementById('statBuy').textContent    = buys.length;
+    document.getElementById('statSell').textContent   = sells.length;
+    document.getElementById('statConf').textContent   = avgConf;
+    document.getElementById('statRR').textContent     = avgRR;
+  }
+
+  function filterSignals(dir, btn) {
+    currentFilter = dir;
+    document.querySelectorAll('.toolbar .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderSignals();
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '—';
+    try { return new Date(ts).toLocaleString('fr'); }
+    catch { return ts; }
+  }
+
+  function getDemoSignals() {
+    return [
+      { pair:'EURUSD', direction:'BUY',  entry_price:1.08542, stop_loss:1.08120, take_profit:1.09175, risk_reward:1.5, confidence:74.0, timeframe:'H1', timestamp: new Date().toISOString(), reasons:['✅ H4 Tendance HAUSSIÈRE','✅ Structure HH+HL','✅ EMA 50 > EMA 200'] },
+      { pair:'XAUUSD', direction:'SELL', entry_price:2341.50, stop_loss:2358.00, take_profit:2317.25, risk_reward:1.5, confidence:68.0, timeframe:'H1', timestamp: new Date().toISOString(), reasons:['✅ H4 Tendance BAISSIÈRE','✅ Structure LH+LL'] },
+      { pair:'GBPUSD', direction:'BUY',  entry_price:1.27431, stop_loss:1.26980, take_profit:1.28108, risk_reward:1.5, confidence:81.0, timeframe:'H1', timestamp: new Date().toISOString(), reasons:['✅ H4 Tendance HAUSSIÈRE','✅ MACD haussier'] },
+    ];
+  }
+
+  // Init
+  loadSignals();
+  setInterval(loadSignals, 60000);
+</script>
+</body>
+</html>
